@@ -6,7 +6,7 @@
 
 1. `COBIP_APP_BE`에서 백엔드와 DB를 실행합니다. 예: `docker compose --profile full up -d --build --wait`
 2. 이 폴더에서 `npm install`을 실행합니다.
-3. `npm run dev`를 실행하고 브라우저에서 `http://127.0.0.1:5173`을 엽니다.
+3. `npm run dev`를 실행하고 브라우저에서 `http://127.0.0.1:5174`를 엽니다.
 4. `ADMIN` 권한을 가진 기존 COBIA 계정으로 로그인합니다. DB에서 권한을 변경했다면 새로 로그인해야 새 JWT에 반영됩니다.
 
 개발 서버는 `/api` 요청을 `http://localhost:8080`의 Spring 서버로 전달합니다. Spring 서버 주소가 다르면 PowerShell에서 `$env:API_PROXY_TARGET='http://localhost:8081'`을 설정하고 `npm run dev`를 실행하세요. 관리자 로그인 토큰은 브라우저 메모리에만 보관되며 새로고침하면 다시 로그인합니다.
