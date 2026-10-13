@@ -42,7 +42,10 @@ export default function QuestionEditor({ mode, rootCategory, languages, question
   const isStandalone = mode === 'standalone';
   const list = questions.filter(question => isStandalone
     ? question.categoryId === rootCategory?.id && question.relatedTemplateId == null && !question.userSaved
-    : question.relatedSectionId === section?.id);
+    : question.relatedSectionId === section?.id)
+    .sort((a, b) => isStandalone
+      ? (b.createdAt || '').localeCompare(a.createdAt || '') || b.id - a.id
+      : a.displayOrder - b.displayOrder || a.id - b.id);
   const [selectedId, setSelectedId] = useState(null);
   const [published, setPublished] = useState(false);
   const [form, setForm] = useState(() => defaultForm({ chapter, section, rootCategory, languages, questions }));
