@@ -41,7 +41,7 @@ function fromApi(question) {
 export default function QuestionEditor({ mode, rootCategory, languages, questions, request, reloadContent, chapter, section }) {
   const isStandalone = mode === 'standalone';
   const list = questions.filter(question => isStandalone
-    ? question.categoryId === rootCategory?.id && question.relatedTemplateId == null
+    ? question.categoryId === rootCategory?.id && question.relatedTemplateId == null && !question.userSaved
     : question.relatedSectionId === section?.id);
   const [selectedId, setSelectedId] = useState(null);
   const [published, setPublished] = useState(false);
@@ -143,6 +143,22 @@ export default function QuestionEditor({ mode, rootCategory, languages, question
     }
   }
 
+  async function remove() {
+    if (!selectedId || !window.confirm('이 문제를 삭제할까요? 기존 제출 기록은 보관됩니다.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await request(`/api/admin/questions/${selectedId}`, { method: 'DELETE' });
+      await reloadContent();
+      startNew();
+      setMessage('문제를 삭제했습니다.');
+    } catch (caught) {
+      setError(caught.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!rootCategory) return <div className="empty-state">문제 분류를 불러오지 못했습니다.</div>;
 
   return <div className={isStandalone ? 'page' : ''}>
@@ -167,7 +183,7 @@ export default function QuestionEditor({ mode, rootCategory, languages, question
         <label>정답 해설 <em>선택</em><textarea rows="3" value={form.explanation} onChange={e => setForm({ ...form, explanation: e.target.value })} placeholder="답을 제출한 뒤 보여줄 해설입니다." /></label>
         {form.questionType === 'CODE_WRITING' && <p className="info-box">현재 코드 작성형 AI 채점은 Java만 지원합니다. Java 언어를 선택했는지 확인하세요.</p>}
         {error && <p className="alert error" role="alert">{error}</p>}{message && <p className="alert success" role="status">{message}</p>}
-        <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '처리 중…' : selectedId ? '변경 저장' : '문제 저장'}</button>{selectedId && <button className="button secondary" type="button" disabled={busy} onClick={togglePublished}>{published ? '비공개로 전환' : '문제 공개'}</button>}</div>
+        <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '처리 중…' : selectedId ? '변경 저장' : '문제 저장'}</button>{selectedId && <button className="button secondary" type="button" disabled={busy} onClick={togglePublished}>{published ? '비공개로 전환' : '문제 공개'}</button>}{selectedId && <button className="button secondary" type="button" disabled={busy} onClick={remove}>문제 삭제</button>}</div>
       </form>
     </div>
   </div>;

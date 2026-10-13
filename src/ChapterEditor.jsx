@@ -52,6 +52,22 @@ function SectionEditor({ chapter, request, onChanged }) {
     }
   }
 
+  async function remove() {
+    if (!selectedId || !window.confirm(`‘${form.title}’ 목차와 하위 목차·연결 문제를 삭제할까요?`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      await request(`/api/admin/templates/${chapter.id}/sections/${selectedId}`, { method: 'DELETE' });
+      await onChanged();
+      startNew();
+      setMessage('목차와 연결 문제를 삭제했습니다.');
+    } catch (caught) {
+      setError(caught.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return <div className="editor-split">
     <div className="item-list">
       <div className="list-heading"><strong>목차</strong><button className="button small secondary" onClick={startNew}>+ 추가</button></div>
@@ -69,7 +85,7 @@ function SectionEditor({ chapter, request, onChanged }) {
       <label>예제 코드 <em>선택</em><textarea className="code-input" rows="7" value={form.exampleCode} onChange={e => setForm({ ...form, exampleCode: e.target.value })} placeholder={'int score = 65;\nif (score > 60) {\n  System.out.println("합격");\n}'} /></label>
       {error && <p className="alert error" role="alert">{error}</p>}
       {message && <p className="alert success" role="status">{message}</p>}
-      <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '저장 중…' : selectedId ? '변경 저장' : '목차 저장'}</button></div>
+      <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '저장 중…' : selectedId ? '변경 저장' : '목차 저장'}</button>{selectedId && <button className="button secondary" type="button" disabled={busy} onClick={remove}>목차 삭제</button>}</div>
     </form>
   </div>;
 }
@@ -171,6 +187,22 @@ export default function ChapterEditor({ kind, rootCategory, categories, language
     }
   }
 
+  async function removeTemplate() {
+    if (!detail || !window.confirm(`‘${detail.title}’ 챕터와 모든 목차·문제를 삭제할까요? 기존 학습 기록과 제출 기록은 보관됩니다.`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      await request(`/api/admin/templates/${detail.id}`, { method: 'DELETE' });
+      await reloadContent();
+      newForm();
+      setMessage('챕터와 연결 콘텐츠를 삭제했습니다.');
+    } catch (caught) {
+      setError(caught.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!rootCategory) return <div className="page"><p className="alert error">분류 정보를 불러오지 못했습니다. 백엔드 연결을 확인해 주세요.</p></div>;
 
   const sections = flattenSections(detail?.sections || []);
@@ -193,7 +225,7 @@ export default function ChapterEditor({ kind, rootCategory, categories, language
           <label>챕터 설명<textarea rows="5" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required placeholder="챕터 전체를 소개하는 설명입니다. 실제 1-1 학습 내용은 목차 탭에서 입력하세요." /></label>
           <label className="narrow-field">표시 순서<input type="number" min="1" value={form.displayOrder} onChange={e => setForm({ ...form, displayOrder: e.target.value })} required /></label>
           {error && <p className="alert error" role="alert">{error}</p>}{message && <p className="alert success" role="status">{message}</p>}
-          <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '처리 중…' : selectedId ? '변경 저장' : '챕터 저장'}</button>{detail && <button className="button secondary" type="button" disabled={busy} onClick={togglePublished}>{detail.published ? '비공개로 전환' : '챕터 공개'}</button>}</div>
+          <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '처리 중…' : selectedId ? '변경 저장' : '챕터 저장'}</button>{detail && <button className="button secondary" type="button" disabled={busy} onClick={togglePublished}>{detail.published ? '비공개로 전환' : '챕터 공개'}</button>}{detail && <button className="button secondary" type="button" disabled={busy} onClick={removeTemplate}>챕터 삭제</button>}</div>
         </form>}
         {tab === 'sections' && detail && <SectionEditor key={detail.id} chapter={detail} request={request} onChanged={() => loadDetail(detail.id)} />}
         {tab === 'questions' && detail && <div className="questions-in-chapter"><div className="section-picker"><label>문제를 연결할 목차<select value={selectedSectionId ?? ''} onChange={e => setSelectedSectionId(e.target.value ? Number(e.target.value) : null)}><option value="">목차를 선택하세요</option>{sections.map(item => <option key={item.id} value={item.id}>{'— '.repeat(item.depth)}{item.title}</option>)}</select></label><p>1-1을 고르면 해당 학습 뒤에 나올 문제를 등록할 수 있습니다.</p></div>{section ? <QuestionEditor key={section.id} mode="section" rootCategory={rootCategory} categories={categories} languages={languages} questions={questions} request={request} reloadContent={reloadContent} chapter={detail} section={section} /> : <div className="empty-state">목차를 선택하면 연결된 문제가 여기에 표시됩니다.</div>}</div>}
