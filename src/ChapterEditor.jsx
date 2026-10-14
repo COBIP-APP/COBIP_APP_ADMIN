@@ -1,16 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Markdown from 'react-markdown';
 import { flattenSections } from './api.js';
 import QuestionEditor from './QuestionEditor.jsx';
 
 const EMPTY_SECTION = { parentSectionId: null, title: '', body: '', exampleCode: '', displayOrder: 1 };
 
 function SectionEditor({ chapter, request, onChanged }) {
+  const bodyRef = useRef(null);
   const sections = flattenSections(chapter.sections || []);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(EMPTY_SECTION);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  function insertMarkdown(prefix, suffix = '', placeholder = '내용', block = false) {
+    const input = bodyRef.current;
+    if (!input) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const content = form.body.slice(start, end) || placeholder;
+    const before = block && start > 0 && form.body[start - 1] !== '\n' ? '\n' : '';
+    const after = block && form.body[end] !== '\n' ? '\n' : '';
+    const inserted = before + prefix + content + suffix + after;
+    setForm(current => ({ ...current, body: current.body.slice(0, start) + inserted + current.body.slice(end) }));
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(start + before.length + prefix.length, start + before.length + prefix.length + content.length);
+    });
+  }
 
   function nextOrder(parentId) {
     return Math.max(0, ...sections.filter(item => item.parentId === parentId).map(item => item.displayOrder)) + 1;
@@ -81,7 +99,23 @@ function SectionEditor({ chapter, request, onChanged }) {
         <label>표시 순서<input type="number" min="1" value={form.displayOrder} onChange={e => setForm({ ...form, displayOrder: e.target.value })} required /></label>
       </div>
       <label>목차 제목<input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} maxLength="150" required placeholder="예: 1-1. 조건식 이해하기" /></label>
-      <label>학습 본문<textarea rows="8" value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder="설명 글을 입력하세요. 줄바꿈은 앱에서도 유지됩니다." /></label>
+      <div className="markdown-editor">
+        <label htmlFor="section-body">학습 본문 <em>Markdown 사용 가능</em></label>
+        <div className="markdown-toolbar" role="group" aria-label="학습 본문 서식">
+          <button type="button" onClick={() => insertMarkdown('## ', '', '소제목', true)}>소제목</button>
+          <button type="button" onClick={() => insertMarkdown('**', '**', '강조할 내용')}>굵게</button>
+          <button type="button" onClick={() => insertMarkdown('- ', '', '목록 항목', true)}>목록</button>
+          <button type="button" onClick={() => insertMarkdown('> ', '', '핵심 내용', true)}>인용</button>
+          <button type="button" onClick={() => insertMarkdown('`', '`', '코드')}>인라인 코드</button>
+        </div>
+        <textarea id="section-body" ref={bodyRef} rows="10" value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder={'## 소제목\n설명에 **강조**를 넣을 수 있습니다.\n\n- 첫 번째 항목\n- 두 번째 항목'} />
+        <div className="markdown-preview" aria-label="학습 본문 미리보기">
+          <strong className="markdown-preview-title">미리보기</strong>
+          {form.body.trim()
+            ? <Markdown skipHtml disallowedElements={['img']}>{form.body}</Markdown>
+            : <p className="muted">본문을 입력하면 서식이 여기에 표시됩니다.</p>}
+        </div>
+      </div>
       <label>예제 코드 <em>선택</em><textarea className="code-input" rows="7" value={form.exampleCode} onChange={e => setForm({ ...form, exampleCode: e.target.value })} placeholder={'int score = 65;\nif (score > 60) {\n  System.out.println("합격");\n}'} /></label>
       {error && <p className="alert error" role="alert">{error}</p>}
       {message && <p className="alert success" role="status">{message}</p>}
