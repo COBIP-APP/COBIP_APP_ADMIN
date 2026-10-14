@@ -34,6 +34,8 @@ export default function CatalogEditor({ languages, categories, practical, reques
     setMessage('');
     try {
       const body = { ...form, code: form.code.trim().toUpperCase(), name: form.name.trim(), displayOrder: Number(form.displayOrder) };
+      if (!body.code || !body.name) throw new Error('표시 이름과 분류 코드를 모두 입력해 주세요.');
+      if (!isLanguage && !practical) throw new Error('실무 분류를 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
       const base = isLanguage ? '/api/admin/languages' : '/api/admin/categories';
       if (selectedId) {
         await request(`${base}/${selectedId}`, { method: 'PUT', body });

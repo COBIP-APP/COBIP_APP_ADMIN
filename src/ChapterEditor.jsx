@@ -153,7 +153,14 @@ export default function ChapterEditor({ kind, rootCategory, categories, language
     setMessage('');
     try {
       if (!form.categoryId || (isGrammar && !form.languageId)) throw new Error('언어 또는 주제를 먼저 선택해 주세요.');
-      const body = { ...form, categoryId: Number(form.categoryId), languageId: form.languageId ? Number(form.languageId) : null, displayOrder: Number(form.displayOrder) };
+      if (!isGrammar && !practicalTopics.some(category => category.id === Number(form.categoryId))) {
+        throw new Error('실무 주제를 다시 선택해 주세요. 원하는 주제가 없다면 ‘언어 · 주제’ 메뉴에서 먼저 추가할 수 있어요.');
+      }
+      const title = form.title.trim();
+      const summary = form.summary.trim();
+      const description = form.description.trim();
+      if (!title || !summary || !description) throw new Error('챕터 제목, 목록 소개, 챕터 설명을 모두 입력해 주세요.');
+      const body = { ...form, title, summary, description, categoryId: Number(form.categoryId), languageId: form.languageId ? Number(form.languageId) : null, displayOrder: Number(form.displayOrder) };
       if (selectedId) {
         await request(`/api/admin/templates/${selectedId}`, { method: 'PUT', body });
         await loadDetail(selectedId);
@@ -206,6 +213,7 @@ export default function ChapterEditor({ kind, rootCategory, categories, language
   if (!rootCategory) return <div className="page"><p className="alert error">분류 정보를 불러오지 못했습니다. 백엔드 연결을 확인해 주세요.</p></div>;
 
   const sections = flattenSections(detail?.sections || []);
+  const questionSections = isGrammar ? sections : sections.filter(item => item.depth > 0 && !item.children?.length);
   const section = sections.find(item => item.id === selectedSectionId);
 
   return <div className="page">
@@ -217,7 +225,7 @@ export default function ChapterEditor({ kind, rootCategory, categories, language
         <div className="tabs"><button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>기본 정보</button><button className={tab === 'sections' ? 'active' : ''} disabled={!selectedId} onClick={() => setTab('sections')}>목차 · 학습 내용 <span>{sections.length}</span></button><button className={tab === 'questions' ? 'active' : ''} disabled={!selectedId} onClick={() => setTab('questions')}>목차별 문제 <span>{questions.filter(q => q.relatedTemplateId === selectedId).length}</span></button></div>
         {tab === 'summary' && <form className="form-card" onSubmit={saveTemplate}>
           <div className="form-grid two">
-            {isGrammar ? <label>학습 언어<select value={form.languageId ?? ''} onChange={e => { const languageId = Number(e.target.value); setForm({ ...form, languageId, displayOrder: nextOrder(rootCategory.id, languageId) }); }} required><option value="">선택하세요</option>{languages.map(language => <option key={language.id} value={language.id}>{language.name}{language.active ? '' : ' · 숨김'}</option>)}</select></label> : <label>실무 주제<select value={form.categoryId ?? ''} onChange={e => { const categoryId = Number(e.target.value); setForm({ ...form, categoryId, displayOrder: nextOrder(categoryId, null) }); }} required><option value="">선택하세요</option>{practicalTopics.map(category => <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' · 숨김'}</option>)}</select></label>}
+            {isGrammar ? <label>학습 언어<select value={form.languageId ?? ''} onChange={e => { const languageId = Number(e.target.value); setForm({ ...form, languageId, displayOrder: nextOrder(rootCategory.id, languageId) }); }} required><option value="">선택하세요</option>{languages.map(language => <option key={language.id} value={language.id}>{language.name}{language.active ? '' : ' · 숨김'}</option>)}</select></label> : <label>실무 주제<select value={form.categoryId ?? ''} onChange={e => { const categoryId = Number(e.target.value); setForm({ ...form, categoryId, displayOrder: nextOrder(categoryId, null) }); }} required><option value="">선택하세요</option>{practicalTopics.map(category => <option key={category.id} value={category.id}>{category.name}{category.active ? '' : ' · 숨김'}</option>)}</select><span className="form-hint">원하는 주제가 없다면 왼쪽 ‘언어 · 주제’ 메뉴에서 추가하세요.</span></label>}
             <label>난이도<select value={form.difficulty} onChange={e => setForm({ ...form, difficulty: e.target.value })}><option value="EASY">초급</option><option value="NORMAL">중급</option><option value="HARD">고급</option></select></label>
           </div>
           <label>챕터 제목<input maxLength="100" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder={isGrammar ? '예: Java 조건문 기초' : '예: 캐시 관리와 Redis 활용'} /></label>
@@ -228,7 +236,7 @@ export default function ChapterEditor({ kind, rootCategory, categories, language
           <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? '처리 중…' : selectedId ? '변경 저장' : '챕터 저장'}</button>{detail && <button className="button secondary" type="button" disabled={busy} onClick={togglePublished}>{detail.published ? '비공개로 전환' : '챕터 공개'}</button>}{detail && <button className="button secondary" type="button" disabled={busy} onClick={removeTemplate}>챕터 삭제</button>}</div>
         </form>}
         {tab === 'sections' && detail && <SectionEditor key={detail.id} chapter={detail} request={request} onChanged={() => loadDetail(detail.id)} />}
-        {tab === 'questions' && detail && <div className="questions-in-chapter"><div className="section-picker"><label>문제를 연결할 목차<select value={selectedSectionId ?? ''} onChange={e => setSelectedSectionId(e.target.value ? Number(e.target.value) : null)}><option value="">목차를 선택하세요</option>{sections.map(item => <option key={item.id} value={item.id}>{'— '.repeat(item.depth)}{item.title}</option>)}</select></label><p>1-1을 고르면 해당 학습 뒤에 나올 문제를 등록할 수 있습니다.</p></div>{section ? <QuestionEditor key={section.id} mode="section" rootCategory={rootCategory} categories={categories} languages={languages} questions={questions} request={request} reloadContent={reloadContent} chapter={detail} section={section} /> : <div className="empty-state">목차를 선택하면 연결된 문제가 여기에 표시됩니다.</div>}</div>}
+        {tab === 'questions' && detail && <div className="questions-in-chapter"><div className="section-picker"><label>문제를 연결할 목차<select value={selectedSectionId ?? ''} onChange={e => setSelectedSectionId(e.target.value ? Number(e.target.value) : null)}><option value="">목차를 선택하세요</option>{questionSections.map(item => <option key={item.id} value={item.id}>{'— '.repeat(item.depth)}{item.title}</option>)}</select></label><p>{isGrammar ? '학습 목차를 고르면 해당 학습 뒤에 나올 문제를 등록할 수 있습니다.' : '1-1 같은 하위 목차에만 문제를 연결합니다. 상위 개요에는 문제를 연결하지 않습니다.'}</p></div>{section && questionSections.some(item => item.id === section.id) ? <QuestionEditor key={section.id} mode="section" rootCategory={rootCategory} categories={categories} languages={languages} questions={questions} request={request} reloadContent={reloadContent} chapter={detail} section={section} /> : <div className="empty-state">목차를 선택하면 연결된 문제가 여기에 표시됩니다.</div>}</div>}
       </section>
     </div>
   </div>;
